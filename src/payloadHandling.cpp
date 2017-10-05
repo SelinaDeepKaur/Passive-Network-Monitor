@@ -457,54 +457,6 @@ int main(int argc, char **argv)
 			return(2);
 		}
     }
-
-    
-
-
-
-
-
-
-
-
-
-
-
-    /*
-    if(option["interface"]=="" )//&& option["file"]=="")
-    {
-		//dev = new char [option["interface"].length()+1];
-		dev = pcap_lookupdev(errbuf);
-		if (dev == NULL) {
-			fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
-			return(2);
-		}
-    }
-    else
- 	{
- 		dev = (char*)malloc(sizeof(option["interface"].length()+1));
- 		strcpy(dev, option["interface"].c_str());
-    	printf("\ndev=%s",dev);
-    }
-
-	
-
-
-
-    
-    if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) 
-    {
-		fprintf(stderr, "Can't get netmask for device %s\n", dev);
-		net = 0;
-		mask = 0;
-	 }
-
-	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-	if (handle == NULL) 
-	{
-		fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
-		return(2);
-	}*/
 	
 	/* make sure we're capturing on an Ethernet device [2] */
 	if (pcap_datalink(handle) != DLT_EN10MB) {
@@ -520,10 +472,10 @@ int main(int argc, char **argv)
 			return(2);
 		}
 		if (pcap_setfilter(handle, &fp) == -1) 
-	{
-		fprintf(stderr, "Couldn't install filter %s: %s\n", expression, pcap_geterr(handle));
-		return(2);
-	}
+		{
+			fprintf(stderr, "Couldn't install filter %s: %s\n", expression, pcap_geterr(handle));
+			return(2);
+		}
 	}
 	
 	//Grab a packet 

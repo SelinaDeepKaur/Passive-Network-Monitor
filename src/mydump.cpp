@@ -1,4 +1,4 @@
-#include "../include/optparse.h"
+.#include "../include/optparse.h"
 #include <pcap/pcap.h>
 #include <iostream>
 #include <stdio.h>
@@ -8,19 +8,17 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <ctime>
-using namespace std;
-/*char * stringToCharPointer(string s)
-{
 
-}*/
 #define SNAP_LEN 1518
 #define SIZE_ETHERNET 14
 #define ETHER_ADDR_LEN	6
 
-#define	ETHERTYPE_PUP		0x0200      /* Xerox PUP */
+//#define	ETHERTYPE_PUP		0x0200      /* Xerox PUP */
 #define	ETHERTYPE_IP		0x0800		/* IP */
 #define	ETHERTYPE_ARP		0x0806		/* Address resolution */
-#define	ETHERTYPE_REVARP	0x8035		/* Reverse ARP */
+#define	ETHERTYPE_RARP		0x8035		/* Reverse ARP */
+#define IP_HL(ip)               (((ip)->ip_vhl) & 0x0f)
+#define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
 /* Ethernet header */
 typedef u_int tcp_seq;
@@ -46,7 +44,7 @@ struct sniff_ip {
         u_short ip_sum;                 /* checksum */
         struct  in_addr ip_src,ip_dst;  /* source and dest address */
 };
-#define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)	
+	
 struct sniff_tcp {
         u_short th_sport;               /* source port */
         u_short th_dport;               /* destination port */
@@ -70,7 +68,62 @@ struct sniff_tcp {
         u_short th_sum;                 /* checksum */
         u_short th_urp;                 /* urgent pointer */
 };
-/*void print_payload(const u_char *payload, int len)
+struct sniff_udp {
+         u_short uh_sport;               /* source port */
+         u_short uh_dport;               /* destination port */
+         u_short uh_ulen;                /* udp length */
+         u_short uh_sum;                 /* udp checksum */
+		 #define SIZE_UDP 8
+
+};
+
+void print_hex_ascii_line(const u_char *payload, int len, int offset)
+{
+
+	int i;
+	int gap;
+	const u_char *ch;
+
+	/* offset */
+	//printf("%05d   ", offset);
+	printf(" ");
+	/* hex */
+	ch = payload;
+	for(i = 0; i < len; i++) {
+		printf("%02x ", *ch);
+		ch++;
+		/* print extra space after 8th byte for visual aid */
+		if (i == 7)
+			printf(" ");
+	}
+	/* print space to handle line less than 8 bytes */
+	if (len < 8)
+		printf(" ");
+	
+	/* fill hex gap with spaces if not full line */
+	if (len < 16) {
+		gap = 16 - len;
+		for (i = 0; i < gap; i++) {
+			printf("   ");
+		}
+	}
+	printf("   ");
+	
+	/* ascii (if printable) */
+	ch = payload;
+	for(i = 0; i < len; i++) {
+		if (isprint(*ch))
+			printf("%c", *ch);
+		else
+			printf(".");
+		ch++;
+	}
+
+	printf("\n");
+
+return;
+}
+void print_payload(const u_char *payload, int len)
 {
 
 	int len_rem = len;
@@ -109,143 +162,293 @@ struct sniff_tcp {
 	}
 
 return;
-}*/
+}
 
 void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const u_char *packet)
 {
 	static int count = 1;                   /* packet counter */
 	
-	/* declare pointers to packet headers */
+	//declare pointers to packet headers 
 	struct sniff_ethernet *ethernet;  /* The ethernet header [1] */
 	struct sniff_ip *ip;              /* The IP header */
 	struct sniff_tcp *tcp;            /* The TCP header */
-	char *payload;                    /* Packet payload */
+	struct sniff_udp *udp;
+
+	u_char *payload;                    /* Packet payload */
 
 	int size_ip;
-	int size_tcp;
+	int size_protocol;
 	int size_payload;
+	int validPacket=-1;
 	
 	u_char *ptr;
 	int i;
-
-	printf("\nPacket number %d:", count);
-	count++;
 	
+
+	
+
 	/* define ethernet header */
 	ethernet = (struct sniff_ethernet*)(packet);
-	
-	/* define/compute ip header offset */
-	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-	//size_ip = IP_HL(ip)*4;
-	size_ip = (((ip)->ip_vhl) & 0x0f)*4;
-	if (size_ip < 20) 
+    /* define/compute ip header offset */
+	if(ntohs (ethernet->ether_type) == ETHERTYPE_IP)
 	{
-		printf("* Invalid IP header length: %u bytes\n", size_ip);
-		return;
-	}
-	
-
-	/*time Stamp*/
-	printf("\nRecieved at %s",ctime((const time_t *)&header->ts.tv_sec));
-
-	
-
-
-	ptr = ethernet->ether_dhost;
-    i = ETHER_ADDR_LEN;
-    printf(" Destination Address:  ");
-    do{
-        printf("%s%x",(i == ETHER_ADDR_LEN) ? " " : ":",*ptr++);
-    }while(--i>0);
-    printf("\n");
-
-    ptr = ethernet->ether_shost;
-    i = ETHER_ADDR_LEN;
-    printf(" Source Address:  ");
-    do{
-        printf("%s%x",(i == ETHER_ADDR_LEN) ? " " : ":",*ptr++);
-    }while(--i>0);
-    printf("\n");
-	/* print source and destination IP addresses */
-	printf("From: %s\n", inet_ntoa(ip->ip_src));
-	printf("To: %s\n", inet_ntoa(ip->ip_dst));
-
-	
-
-	/* Do a couple of checks to see what packet type we have..*/
-    if (ntohs (ethernet->ether_type) == ETHERTYPE_IP)
-    {
-        printf("Ethernet type hex:%x dec:%d is an IP packet\n",
-                ntohs(ethernet->ether_type),
-                ntohs(ethernet->ether_type));
-    }else  if (ntohs (ethernet->ether_type) == ETHERTYPE_ARP)
-    {
-        printf("Ethernet type hex:%x dec:%d is an ARP packet\n",
-                ntohs(ethernet->ether_type),
-                ntohs(ethernet->ether_type));
-    }else {
-        printf("Ethernet type %x not IP", ntohs(ethernet->ether_type));
-        exit(1);
-    }
-	
+		ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
+		size_ip = IP_HL(ip)*4;
+		//size_ip = (((ip)->ip_vhl) & 0x0f)*4;
+		if (size_ip < 20) 
+		{
+			printf("* Invalid IP header length: %u bytes\n", size_ip);
+			return;
+		}
 	
 
 
-	printf("len %d", header->len);
+		//printf("len %d", ntohs(ip->ip_len));
 
 
+		//int flag=-1;
 
+		std::string protocolName;
+		int srcPort = -1;
+		int destPort = -1;
 	/* determine protocol */	
-	switch(ip->ip_p) 
-	{
-		case IPPROTO_TCP:
-			printf("   Protocol: TCP\n");
-			break;
-		case IPPROTO_UDP:
-			printf("   Protocol: UDP\n");
-			return;
-		case IPPROTO_ICMP:
-			printf("   Protocol: ICMP\n");
-			return;
-		case IPPROTO_IP:
-			printf("   Protocol: IP\n");
-			return;
-		default:
-			printf("   Protocol: unknown\n");
-			return;
-	}
-	/* define/compute tcp header offset */
-	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-	size_tcp = TH_OFF(tcp)*4;
-	if (size_tcp < 20) 
-	{
-		printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-		return;
-	}
-	printf("   Src port: %d\n", ntohs(tcp->th_sport));
-	printf("   Dst port: %d\n", ntohs(tcp->th_dport));
-	/* define/compute tcp header offset */
-	/*tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-	size_tcp = TH_OFF(tcp)*4;
-	if (size_tcp < 20) {
-		printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-		return;
-	}
+		switch(ip->ip_p) 
+		{
+			case IPPROTO_TCP:
+				//flag=0;
+				//printf("   Protocol: TCP\n");
+				protocolName = "TCP";
+
+				tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+				//char *p= tcp;
+				//size_tcp = TH_OFF(tcp)*4;
+				size_protocol= TH_OFF(tcp)*4;
+				if (size_protocol < 20) 
+				{
+					printf("   * Invalid TCP header length: %u bytes\n", size_protocol);
+					return;
+				}
 	
-	printf("   Src port: %d\n", ntohs(tcp->th_sport));
-	printf("   Dst port: %d\n", ntohs(tcp->th_dport));
+				srcPort = ntohs(tcp->th_sport);
+				destPort = ntohs(tcp->th_dport);
 	
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-	size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
-	if (size_payload > 0) 
+				/* define/compute tcp payload (segment) offset */
+				payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_protocol);
+				/*printf("SELINAaaaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaa\n");
+				printf("%s",(char *)args);
+				printf("%s\n", payload);
+				if(strstr((char *)payload,(char *)args))
+				{
+					printf("\nMATCHINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG\n");
+
+				}*/
+				/* compute tcp payload (segment) size */
+				size_payload = ntohs(ip->ip_len) - (size_ip + size_protocol);
+	
+				/*
+				 * Print payload data; it might be binary, so don't just
+				 * treat it as a string.
+	 			*/
+				/*if (size_payload > 0) 
+				{
+					printf("   Payload (%d bytes):\n", size_payload);
+					print_payload(payload, size_payload);
+				}*/
+
+
+				break;
+
+			case IPPROTO_UDP:
+				//flUDP1;
+				protocolName = "UDP";
+				//printf("   Protocol: UDP\n");
+				udp=(struct sniff_udp*)(packet + SIZE_ETHERNET + size_ip);
+				size_protocol = SIZE_UDP;
+
+				srcPort = ntohs(udp->uh_sport);
+				destPort = ntohs(udp->uh_dport);
+				payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_protocol);
+				size_payload = ntohs(ip->ip_len) - (size_ip + size_protocol);
+
+				/*if(size_payload > 0)
+				{
+					printf("   Payload (%d bytes:\n", size_payload);
+					print_payload(payload, size_payload);
+				}*/
+
+
+				break;
+			case IPPROTO_ICMP:
+				//flag=2;
+				protocolName = "ICMP";
+				//printf("   Protocol: ICMP\n");
+
+				/*size of ICMP header is 8 bytes*/;
+				size_protocol = 8;
+				payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_protocol);
+
+				size_payload = ntohs(ip->ip_len) - (size_ip + size_protocol);
+
+				/*if(size_payload > 0)
+				{
+					printf("   Payload (%d bytes:\n", size_payload);
+					print_payload(payload, size_payload);
+				}*/
+
+				break;
+			
+			default:
+				//flag=3;
+				protocolName = "Unknown Protocol";
+				//printf("   Protocol: unknown\n");
+				payload = (u_char *)(packet + SIZE_ETHERNET + size_ip);
+
+				size_payload = ntohs(ip->ip_len) - size_ip;
+
+				/*if(size_payload > 0)
+				{
+					printf("   Payload (%d bytes:\n", size_payload);
+					print_payload(payload, size_payload);
+				}*/
+
+				break;
+		}
+		printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nTHE FINASLLLLLLL FORMATTTTTTT\n");
+		
+		payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_protocol);
+		//printf("SELINAaaaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaaaaaaaaaaaaaaa\n");
+		printf("argument=%s\n",(char *)args);
+		//printf("payload=%s\n", payload);
+
+		if(args==NULL)
+		{
+			validPacket=1;
+			printf("\n-s option not passed\n");
+		}
+		else if(args!=NULL&&strstr((char *)payload,(char *)args))
+		{
+			validPacket=1;
+			printf("\nMATCHINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG\n");
+		}
+		if(validPacket==1)
+		{
+			printf("\nVALIDDDDDDDDDDDDDDDDDDPACKETTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT\n");
+
+		
+
+			//printf("\n Packet number %d:", count);
+			count++;
+			printf("\n %s",ctime((const time_t *)&header->ts.tv_sec));
+
+			ptr = ethernet->ether_shost;
+			i = ETHER_ADDR_LEN;
+
+			//printf(" Source Address:  ");
+			do{
+				printf("%s%x",(i == ETHER_ADDR_LEN) ? " " : ":",*ptr++);
+			}while(--i>0);
+			printf(" ->");
+
+			ptr = ethernet->ether_dhost;
+			i = ETHER_ADDR_LEN;
+			//printf(" Destination Address:  ");
+			do{
+				printf("%s%x",(i == ETHER_ADDR_LEN) ? " " : ":",*ptr++);
+			}while(--i>0);
+			//printf(" ");
+
+			
+
+			printf(" type 0x%x (IP packet)",ntohs(ethernet->ether_type));
+			printf(" len %d", ntohs(ip->ip_len));
+			printf("\n %s:", inet_ntoa(ip->ip_src));
+			if(srcPort!=-1)
+				printf("%d",srcPort);
+			printf(" -> %s:", inet_ntoa(ip->ip_dst));
+			if(srcPort!=-1)
+				printf("%d",destPort);
+
+			printf(" %s\n",protocolName.c_str());
+			if(srcPort!=-1)
+				//print srcPort
+				//print destPort 
+
+			/*if(flag==0)
+			{
+				printf(" TCP\n");
+				printf("   Src port: %d\n", ntohs(tcp->th_sport));
+				printf("   Dst port: %d\n", ntohs(tcp->th_dport));
+			}
+			else if(flag==1)
+			{	
+				printf(" UDP\n");
+				printf("   Src port: %d\n", ntohs(udp->uh_sport));
+				printf("   Dst port: %d\n", ntohs(udp->uh_dport));
+			}
+			else if(flag==2)
+			{
+				printf(" ICMP\n");
+			}
+			else if(flag==3)
+			{
+				printf(" Unknown Protocol\n");
+			}*/
+
+			if (size_payload > 0) 
+			{
+				//printf("   Payload (%d bytes):\n", size_payload);
+				print_payload(payload, size_payload);
+			}
+		
+
+		}
+
+		/* define/compute tcp header offset */
+	
+	}
+	else
 	{
-		printf("   Payload (%d bytes):\n", size_payload);
-		print_payload(payload, size_payload);
-	}*/
-	
-return;
-	//printf("Recieved at %s\n",ctime((const time_t *)&header->ts.tv_sec));
-	//printf("%d\n", header->len);
+		printf("\n\n\n\n\n\n\n\n\n\nIT IS NOT AN IP PACKET");
+		//printf("\n Packet number %d:", count);
+		count++;
+		printf("\n %s",ctime((const time_t *)&header->ts.tv_sec));
+
+		ptr = ethernet->ether_shost;
+		i = ETHER_ADDR_LEN;
+
+		//printf(" Source Address:  ");
+		do{
+			printf("%s%x",(i == ETHER_ADDR_LEN) ? " " : ":",*ptr++);
+		}while(--i>0);
+		printf(" -> ");
+
+		ptr = ethernet->ether_dhost;
+		i = ETHER_ADDR_LEN;
+		//printf(" Destination Address:  ");
+		do{
+			printf("%s%x",(i == ETHER_ADDR_LEN) ? " " : ":",*ptr++);
+		}while(--i>0);
+		//printf("\n");
+
+		
+		if (ntohs (ethernet->ether_type) == ETHERTYPE_ARP)
+    	{
+        	printf(" type 0x%x (ARP packet) ", ntohs(ethernet->ether_type));
+                //ntohs(ethernet->ether_type));
+    	}
+    	else if (ntohs(ethernet->ether_type) == ETHERTYPE_RARP)
+		{
+			printf(" type 0x%x (RARP packet)", ntohs(ethernet->ether_type));
+		}
+    	
+		else
+    	{
+        	printf(" type 0x%x (not IP or ARP or RARP)\n", ntohs(ethernet->ether_type));
+        //exit(1);
+    	}
+
+	}
+	return;
 	
 }
 int main(int argc, char **argv)
@@ -257,6 +460,7 @@ int main(int argc, char **argv)
 	pcap_t *handle;
 	struct pcap_pkthdr header;	/* The header that pcap gives us */
 	const u_char *packet;
+
     optparse::OptionParser parser =optparse::OptionParser().description("Option Parser");
 
     parser.add_option("-i").dest("interface");
@@ -266,44 +470,53 @@ int main(int argc, char **argv)
     
     if(argc%2==0)
     {
+    	
     	expression = argv[argc-1];
-    	cout<<expression;
+    	printf("The expression = %s",expression);
     }
     const optparse::Values option = parser.parse_args(argc, argv);
     const std::vector<std::string> args = parser.args();
-    if(option["interface"]=="" )//&& option["file"]=="")
+
+    if(option["file"]!="")
     {
-		//dev = new char [option["interface"].length()+1];
-		dev = pcap_lookupdev(errbuf);
-		if (dev == NULL) {
-			fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
+
+    	handle = pcap_open_offline(option["file"].c_str(), errbuf);
+    	if (handle == NULL) 
+		{
+			fprintf(stderr, "Couldn't open pcap file %s: %s\n", option["file"].c_str(), errbuf);
 			return(2);
 		}
-		std::cout <<"\ndevice="<<dev<<"\n";
     }
     else
- 	{
- 		std::cout<<"testing";
- 		dev = new char [option["interface"].length()+1];
- 		//std::cout<<option["interface"].c_str();
- 		
-    	std::strcpy(dev, option["interface"].c_str());
-    	std::cout<<"\ndev="<<dev<<"\n";
-    }
-    
-    if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) 
     {
-		fprintf(stderr, "Can't get netmask for device %s\n", dev);
-		net = 0;
-		mask = 0;
-	 }
+    	if(option["interface"]!="" )
+    	{
+    		dev = (char*)malloc(sizeof(option["interface"].length()+1));
+ 			strcpy(dev, option["interface"].c_str());
+    		printf("\ndev=%s",dev);	
+    	}
+    	else
+    	{
+    		dev = pcap_lookupdev(errbuf);
+			if (dev == NULL) {
+				fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
+				return(2);
+				}
+    	}
+    	if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) 
+    	{
+			fprintf(stderr, "Can't get netmask for device %s\n", dev);
+			net = 0;
+			mask = 0;
+	 	}
 
-	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
-	if (handle == NULL) 
-	{
-		fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
-		return(2);
-	}
+		handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+		if (handle == NULL) 
+		{
+			fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
+			return(2);
+		}
+    }
 	
 	/* make sure we're capturing on an Ethernet device [2] */
 	if (pcap_datalink(handle) != DLT_EN10MB) {
@@ -318,24 +531,25 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Couldn't parse filter %s: %s\n", expression, pcap_geterr(handle));
 			return(2);
 		}
+		if (pcap_setfilter(handle, &fp) == -1) 
+		{
+			fprintf(stderr, "Couldn't install filter %s: %s\n", expression, pcap_geterr(handle));
+			return(2);
+		}
 	}
-	if (pcap_setfilter(handle, &fp) == -1) 
-	{
-		fprintf(stderr, "Couldn't install filter %s: %s\n", expression, pcap_geterr(handle));
-		return(2);
-	}
+	
 	//Grab a packet 
 	//packet = pcap_next(handle, &header);
-	pcap_loop(handle, 0, pcap_handler_callback, NULL);
+	if(option["string"]!="")
+		pcap_loop(handle, 0, pcap_handler_callback, (u_char *)option["string"].c_str());
+	else
+		pcap_loop(handle, 0, pcap_handler_callback, NULL);
+
+	
+
+	//pcap_loop(handle, 0, pcap_handler_callback, (u_char *)option["string"].c_str());
 	// And close the session 
 	pcap_close(handle);
 	return(0);
 
-
-
-    //if (options.get("string"))
-    /*if (options["string"])
-    {
-        std::cout << options["file"] << "\n";
-    }*/
 }

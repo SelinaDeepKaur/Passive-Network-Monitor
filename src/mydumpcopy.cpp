@@ -21,6 +21,8 @@
 #define	ETHERTYPE_IP		0x0800		/* IP */
 #define	ETHERTYPE_ARP		0x0806		/* Address resolution */
 //#define	ETHERTYPE_REVARP	0x8035		/* Reverse ARP */
+#define IP_HL(ip)               (((ip)->ip_vhl) & 0x0f)
+#define IP_V(ip)                (((ip)->ip_vhl) >> 4)
 
 /* Ethernet header */
 typedef u_int tcp_seq;
@@ -46,7 +48,7 @@ struct sniff_ip {
         u_short ip_sum;                 /* checksum */
         struct  in_addr ip_src,ip_dst;  /* source and dest address */
 };
-#define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)	
+	
 struct sniff_tcp {
         u_short th_sport;               /* source port */
         u_short th_dport;               /* destination port */
@@ -70,7 +72,54 @@ struct sniff_tcp {
         u_short th_sum;                 /* checksum */
         u_short th_urp;                 /* urgent pointer */
 };
-/*void print_payload(const u_char *payload, int len)
+
+void print_hex_ascii_line(const u_char *payload, int len, int offset)
+{
+
+	int i;
+	int gap;
+	const u_char *ch;
+
+	/* offset */
+	printf("%05d   ", offset);
+	
+	/* hex */
+	ch = payload;
+	for(i = 0; i < len; i++) {
+		printf("%02x ", *ch);
+		ch++;
+		/* print extra space after 8th byte for visual aid */
+		if (i == 7)
+			printf(" ");
+	}
+	/* print space to handle line less than 8 bytes */
+	if (len < 8)
+		printf(" ");
+	
+	/* fill hex gap with spaces if not full line */
+	if (len < 16) {
+		gap = 16 - len;
+		for (i = 0; i < gap; i++) {
+			printf("   ");
+		}
+	}
+	printf("   ");
+	
+	/* ascii (if printable) */
+	ch = payload;
+	for(i = 0; i < len; i++) {
+		if (isprint(*ch))
+			printf("%c", *ch);
+		else
+			printf(".");
+		ch++;
+	}
+
+	printf("\n");
+
+return;
+}
+void print_payload(const u_char *payload, int len)
 {
 
 	int len_rem = len;
@@ -109,7 +158,7 @@ struct sniff_tcp {
 	}
 
 return;
-}*/
+}
 
 void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const u_char *packet)
 {
@@ -119,7 +168,7 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 	struct sniff_ethernet *ethernet;  /* The ethernet header [1] */
 	struct sniff_ip *ip;              /* The IP header */
 	struct sniff_tcp *tcp;            /* The TCP header */
-	char *payload;                    /* Packet payload */
+	u_char *payload;                    /* Packet payload */
 
 	int size_ip;
 	int size_tcp;
@@ -163,8 +212,8 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
     }else  if (ntohs (ethernet->ether_type) == ETHERTYPE_ARP)
     {
         printf("Ethernet type hex:0x%x. It is an ARP packet\n",
-                ntohs(ethernet->ether_type),
                 ntohs(ethernet->ether_type));
+                //ntohs(ethernet->ether_type));
     }else {
         printf("Ethernet type 0x%x. It is not IP or ARP", ntohs(ethernet->ether_type));
         //exit(1);
@@ -174,8 +223,8 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 	if(ntohs (ethernet->ether_type) == ETHERTYPE_IP)
 	{
 		ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-		//size_ip = IP_HL(ip)*4;
-		size_ip = (((ip)->ip_vhl) & 0x0f)*4;
+		size_ip = IP_HL(ip)*4;
+		//size_ip = (((ip)->ip_vhl) & 0x0f)*4;
 		if (size_ip < 20) 
 		{
 			printf("* Invalid IP header length: %u bytes\n", size_ip);
@@ -208,7 +257,38 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 		{
 			case IPPROTO_TCP:
 				printf("   Protocol: TCP\n");
-				break;
+
+
+
+				tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+				size_tcp = TH_OFF(tcp)*4;
+				if (size_tcp < 20) 
+				{
+					printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
+					return;
+				}
+	
+				printf("   Src port: %d\n", ntohs(tcp->th_sport));
+				printf("   Dst port: %d\n", ntohs(tcp->th_dport));
+	
+				/* define/compute tcp payload (segment) offset */
+				payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+	
+				/* compute tcp payload (segment) size */
+				size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
+	
+				/*
+				 * Print payload data; it might be binary, so don't just
+				 * treat it as a string.
+	 			*/
+				if (size_payload > 0) 
+				{
+					printf("   Payload (%d bytes):\n", size_payload);
+					print_payload(payload, size_payload);
+				}
+
+
+				return;
 			case IPPROTO_UDP:
 				printf("   Protocol: UDP\n");
 				return;
@@ -223,7 +303,12 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 				return;
 		}
 		/* define/compute tcp header offset */
-		tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+		
+
+
+
+
+		/*tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
 		size_tcp = TH_OFF(tcp)*4;
 		if (size_tcp < 20) 
 		{
@@ -231,7 +316,13 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 			return;
 		}
 		printf("   Src port: %d\n", ntohs(tcp->th_sport));
-		printf("   Dst port: %d\n", ntohs(tcp->th_dport));
+		printf("   Dst port: %d\n", ntohs(tcp->th_dport));*/
+		
+
+
+
+
+
 		/* define/compute tcp header offset */
 		/*tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
 		size_tcp = TH_OFF(tcp)*4;
