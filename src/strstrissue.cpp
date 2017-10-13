@@ -74,6 +74,7 @@ struct sniff_udp {
          u_short uh_ulen;                /* udp length */
          u_short uh_sum;                 /* udp checksum */
 		 #define SIZE_UDP 8
+		
 
 };
 
@@ -83,6 +84,7 @@ void print_hex_ascii_line(const u_char *payload, int len, int offset)
 	int i;
 	int gap;
 	const u_char *ch;
+	
 
 	/* offset */
 	//printf("%05d   ", offset);
@@ -110,14 +112,52 @@ void print_hex_ascii_line(const u_char *payload, int len, int offset)
 	printf("   ");
 	
 	/* ascii (if printable) */
-	ch = payload;
+	// ch = payload;
+	// for(i = 0; i < len; i++) {
+	// 	if (isprint(*ch))
+	// 		printf("%c", *ch);
+	// 	else
+	// 		printf(".");
+	// 	ch++;
+	// }
+
+	
+	char *payloadCopy = (char *)malloc(len);
+	char *payloadCopyPtr = payloadCopy;
+	char c;
+	
+	
+	//printf("Memcpy1-------");
+	memcpy(payloadCopy,payload,len);
+	//printf("Memcpy2-------");
+	//printf("%s\n",payloadCopy);
 	for(i = 0; i < len; i++) {
-		if (isprint(*ch))
-			printf("%c", *ch);
+		if(isprint(*payloadCopyPtr))
+		{
+			
+			*payloadCopyPtr++;
+		}
 		else
-			printf(".");
-		ch++;
+		{
+			c='@';
+			//strcpy(c,".");
+			*payloadCopyPtr=c;
+			//*payloadCopy=".";
+			*payloadCopyPtr++;
+		}
+
+	
 	}
+	//printf("Storing the payload wala print-----------------------");
+	printf("%s\n",payloadCopy);
+	//printf("--------------------Just printed itttt");
+
+
+	// printf("Storing the payload wala print-----------------------");
+	// printf("%s\n",payloadCopy);
+	// printf("--------------------Just printed itttt");
+
+
 
 	printf("\n");
 
@@ -247,6 +287,7 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 			case IPPROTO_UDP:
 				//flUDP1;
 				protocolName = "UDP";
+				//printf("UDP-------");
 				//printf("   Protocol: UDP\n");
 				udp=(struct sniff_udp*)(packet + SIZE_ETHERNET + size_ip);
 				size_protocol = SIZE_UDP;
@@ -255,6 +296,45 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 				destPort = ntohs(udp->uh_dport);
 				payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_protocol);
 				size_payload = ntohs(ip->ip_len) - (size_ip + size_protocol);
+				// printf("Memcpy3-------");
+				// if (size_payload > 0)
+				// {
+				// 	//printf("%s\n",payload);
+				// 	char *payloadCopy = (char *)malloc(size_payload);;
+				// 	char *payloadCopyPtr = payloadCopy;
+				// 	char c;
+					
+					
+				// 	printf("Memcpy1-------");
+				// 	memcpy(payloadCopy, payload,size_payload);
+				// 	printf("Memcpy2-------");
+				// 	printf("%s\n",payload);
+				// 	for(i = 0; i < size_payload; i++) {
+				// 		if(isprint(*payloadCopyPtr))
+				// 		{
+							
+				// 			*payloadCopyPtr++;
+				// 		}
+				// 		else
+				// 		{
+				// 			c='.';
+				// 			//strcpy(c,".");
+				// 			*payloadCopyPtr=c;
+				// 			//*payloadCopy=".";
+				// 			*payloadCopyPtr++;
+				// 		}
+
+
+				// //printf("%c", *ch);
+				// //else
+				// //	printf(".");
+					
+				// 	}
+				// 	printf("Storing the payload wala print-----------------------");
+				// 	printf("%s\n",payloadCopy);
+				// 	printf("--------------------Just printed itttt");
+				// }
+				
 
 				break;
 			case IPPROTO_ICMP:
