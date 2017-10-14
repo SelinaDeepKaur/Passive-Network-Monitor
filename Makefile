@@ -4,6 +4,6 @@ OUTPUT= bin/mydump
 LIB= -lpcap
 
 all:
-	$(CC) $(SOURCE) -o $(OUTPUT) $(LIB)
+	$(CC) $(SOURCE) -o $(OUTPUT) -w $(LIB)
 clean:
 	rm -vf $(OUTPUT)
