@@ -10,24 +10,24 @@ Design:
 •	-s (string)
 •	expression
 
-mydump [-i interface] [-r file] [-s string] expression
+    mydump [-i interface] [-r file] [-s string] expression
 
--i  Live capture from the network device <interface> (e.g., eth0). If not
-    specified, mydump should automatically select a default interface to
-    listen on (hint 1). Capture should continue indefinitely until the user
-    terminates the program.
+    -i  Live capture from the network device <interface> (e.g., eth0). If not
+        specified, mydump should automatically select a default interface to
+        listen on (hint 1). Capture should continue indefinitely until the user
+        terminates the program.
 
--r Read packets from <file> in tcpdump format.
+    -r Read packets from <file> in tcpdump format.
 
--s Keep only packets that contain <string> in their payload (after any BPF
-    filter is applied). You are not required to implement wildcard or regular
-    expression matching. A simple string matching operation should suffice
-    (hint 3).
+    -s Keep only packets that contain <string> in their payload (after any BPF
+        filter is applied). You are not required to implement wildcard or regular
+        expression matching. A simple string matching operation should suffice
+        (hint 3).
 
-<expression> is a BPF filter that specifies which packets will be dumped. If
-no filter is given, all packets seen on the interface (or contained in the
-trace) should be dumped. Otherwise, only packets matching <expression> should
-be dumped
+    <expression> is a BPF filter that specifies which packets will be dumped. If
+    no filter is given, all packets seen on the interface (or contained in the
+    trace) should be dumped. Otherwise, only packets matching <expression> should
+    be dumped
 
 3)	Once the application is run, it checks if a pcap file has been provided (option –r) , if yes, the pcap file is picked up       and the packets captured inside it are analyzed. If the pcap file is not provided the application checks if an interface       to capture packets has been provided by the user (option –i).
     If the interface is also not provided, the default device is picked up.
@@ -43,9 +43,9 @@ be dumped
 
 Commands:
 
-Compile: make all
+    Compile: make all
 
-Run: bin/mydump
+    Run: bin/mydump
 
 References:
 
