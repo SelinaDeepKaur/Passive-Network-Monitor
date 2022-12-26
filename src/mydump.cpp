@@ -14,7 +14,8 @@
 #define ETHER_ADDR_LEN 6
 #define	ETHERTYPE_IP 0x0800		    // IP 
 #define	ETHERTYPE_ARP 0x0806		// Address resolution protocol
-#define	ETHERTYPE_RARP 0x8035		// Reverse ARP 
+#define	ETHERTYPE_RARP 0x8035		// Reverse ARP
+#define IP_HEADER_LENGTH 20
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 using namespace std;
@@ -149,20 +150,21 @@ void print_payload(const u_char *payload, int len)
 return;
 }
 
+/*
+	Function to handle the processing of Packet captured from live interface/ Read from offline PCAP file	
+*/
+
 void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const u_char *packet)
 {                    
 	struct sniff_ethernet *ethernet;  
 	struct sniff_ip *ip;              
 	struct sniff_tcp *tcp;            
 	struct sniff_udp *udp;
-	u_char *payload;                    
-	int size_ip;
-	int size_protocol;
-	int size_payload;
-	int validPacket=-1;
+	u_char *payload, *ptr;
+	int size_ip ,size_protocol, size_payload, validPacket=-1;
 	char buffer[80];
 	struct tm * timeinfo; 
-	u_char *ptr;
+	
 	int i;
 
 	ethernet = (struct sniff_ethernet*)(packet);
@@ -172,7 +174,7 @@ void pcap_handler_callback(u_char *args, const struct pcap_pkthdr *header,const 
 		ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
 		size_ip = IP_HL(ip)*4;
 		//size_ip = (((ip)->ip_vhl) & 0x0f)*4;
-		if (size_ip < 20) 
+		if (size_ip < IP_HEADER_LENGTH) 
 		{
 			printf("* Invalid IP header length: %u bytes\n", size_ip);
 			return;
@@ -351,7 +353,7 @@ int main(int argc, char **argv)
             expression += " ";
             expression += string(argv[index]);
     }
-
+	/*When reading from PCAP file instead of live interface */
     if(file!="")
     {
     	handle = pcap_open_offline(file.c_str(), errbuf);
@@ -370,7 +372,7 @@ int main(int argc, char **argv)
     	}
     	else
     	{
-    		dev = pcap_lookupdev(errbuf);
+    		dev = pcap_lookupdev(errbuf);		
 			if (dev == NULL) {
 				fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
 				return(2);
@@ -383,7 +385,7 @@ int main(int argc, char **argv)
 			mask = 0;
 	 	}
 
-		handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+		handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf); /* Reading from interface provided*/
 		if (handle == NULL) 
 		{
 			fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
@@ -412,7 +414,7 @@ int main(int argc, char **argv)
 	}
 	
 	if(s!="")
-		pcap_loop(handle, 0, pcap_handler_callback, (u_char *)s.c_str());
+		pcap_loop(handle, 0, pcap_handler_callback, (u_char *)s.c_str());		
 	else
 		pcap_loop(handle, 0, pcap_handler_callback, NULL);
 
